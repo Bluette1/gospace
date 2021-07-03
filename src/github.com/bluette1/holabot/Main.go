@@ -1,118 +1,80 @@
+// Copyright 2011 Arne Roomann-Kurrik
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
-    "os"
-    "fmt"
-    "bytes"
-    "log"
-    "io/ioutil"
-    "github.com/gorilla/mux"
-    "github.com/joho/godotenv"
-    "github.com/dghubble/oauth1"
-    "net/http"
-    "net/url"
-    "crypto/hmac"
-    "crypto/sha256"
-    "encoding/base64"
-    "encoding/json"
+	"fmt"
+	"github.com/kurrik/oauth1a"
+	"github.com/kurrik/twittergo"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"strings"
 )
 
-func main(){
-    //Load env
-    err := godotenv.Load()
-    if err != nil {
-        log.Fatal("Error loading .env file")
-        fmt.Println("Error loading .env file")
-    }
-    fmt.Println("Starting Server")
-    
-    //Check for -register in agument list
-    if args := os.Args; len(args) > 1 && args[1] == "-register"{
-        go registerWebhook()
-    }
-
-    //Create a new Mux Handler
-    m := mux.NewRouter()
-    //Listen to the base url and send a response
-    m.HandleFunc("/", func(writer http.ResponseWriter, _ *http.Request) {
-        writer.WriteHeader(200)
-        fmt.Fprintf(writer, "Server is up and running")
-    })
-    //Listen to crc check and handle
-    m.HandleFunc("/webhook/twitter", CrcCheck).Methods("GET")
-
-    //Start Server
-    server := &http.Server{
-        Handler: m,
-    }
-    server.Addr = ":9090"
-    server.ListenAndServe()
+func LoadCredentials() (client *twittergo.Client, err error) {
+	credentials, err := ioutil.ReadFile("CREDENTIALS")
+	if err != nil {
+		return
+	}
+	lines := strings.Split(string(credentials), "\n")
+	config := &oauth1a.ClientConfig{
+		ConsumerKey:    lines[0],
+		ConsumerSecret: lines[1],
+	}
+	user := oauth1a.NewAuthorizedConfig(lines[2], lines[3])
+	client = twittergo.NewClient(config, user)
+	return
 }
 
-func CrcCheck(writer http.ResponseWriter, request *http.Request){
-    //Set response header to json type
-    writer.Header().Set("Content-Type", "application/json")
-    //Get crc token in parameter
-    token := request.URL.Query()["crc_token"]
-    if len(token) < 1 {
-        fmt.Fprintf(writer,"No crc_token given")
-        return
-    }
-
-    //Encrypt and encode in base 64 then return
-    h := hmac.New(sha256.New, []byte(os.Getenv("CONSUMER_SECRET")))
-    h.Write([]byte(token[0]))
-    encoded := base64.StdEncoding.EncodeToString(h.Sum(nil))
-    //Generate response string map
-    response := make(map[string]string)
-    response["response_token"] =  "sha256=" + encoded
-    //Turn response map to json and send it to the writer
-    responseJson, _ := json.Marshal(response)
-    fmt.Fprintf(writer, string(responseJson))
-}
-
-func CreateClient() *http.Client {
-    //Create oauth client with consumer keys and access token
-    config := oauth1.NewConfig(os.Getenv("CONSUMER_KEY"), os.Getenv("CONSUMER_SECRET"))
-    token := oauth1.NewToken(os.Getenv("ACCESS_TOKEN_KEY"), os.Getenv("ACCESS_TOKEN_SECRET"))
-    // subscribeWebhook()
-
-    return config.Client(oauth1.NoContext, token)
-}
-func registerWebhook(){
-    fmt.Println("Registering webhook...")
-    httpClient := CreateClient()
-
-    //Set parameters
-    path := "https://api.twitter.com/1.1/account_activity/webhooks.json"
-
-    values := url.Values{}
-    values.Set("url", os.Getenv("APP_URL")+"/webhook/twitter")
-
-    //Make Oauth Post with parameters
-    resp, _ := httpClient.PostForm(path, values)
-    defer resp.Body.Close()
-    //Parse response and check response
-    body, _ := ioutil.ReadAll(resp.Body)
-    var data map[string]interface{}
-    if err := json.Unmarshal([]byte(body), &data); err != nil {
-        panic(err)
-    }
-    fmt.Println("Webhook id of " + data["id"].(string) + " has been registered")
-}
-
-func subscribeWebhook(){
-    fmt.Println("Subscribing webapp...")
-    client := CreateClient()
-    path := "https://api.twitter.com/1.1/account_activity/all/" + os.Getenv("WEBHOOK_ENV") + "/subscriptions.json"
-    resp, _ := client.PostForm(path, nil)
-    body, _ := ioutil.ReadAll(resp.Body)
-    defer resp.Body.Close()
-    //If response code is 204 it was successful
-    if resp.StatusCode == 204 {
-        fmt.Println("Subscribed successfully")
-    } else if resp.StatusCode!= 204 {
-        fmt.Println("Could not subscribe the webhook. Response below:")
-        fmt.Println(string(body))
-    }
+func main() {
+	var (
+		err    error
+		client *twittergo.Client
+		req    *http.Request
+		resp   *twittergo.APIResponse
+		user   *twittergo.User
+	)
+	client, err = LoadCredentials()
+	if err != nil {
+		fmt.Printf("Could not parse CREDENTIALS file: %v\n", err)
+		os.Exit(1)
+	}
+	req, err = http.NewRequest("GET", "/1.1/account/verify_credentials.json", nil)
+	if err != nil {
+		fmt.Printf("Could not parse request: %v\n", err)
+		os.Exit(1)
+	}
+	resp, err = client.SendRequest(req)
+	if err != nil {
+		fmt.Printf("Could not send request: %v\n", err)
+		os.Exit(1)
+	}
+	user = &twittergo.User{}
+	err = resp.Parse(user)
+	if err != nil {
+		fmt.Printf("Problem parsing response: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("ID:                   %v\n", user.Id())
+	fmt.Printf("Name:                 %v\n", user.Name())
+	if resp.HasRateLimit() {
+		fmt.Printf("Rate limit:           %v\n", resp.RateLimit())
+		fmt.Printf("Rate limit remaining: %v\n", resp.RateLimitRemaining())
+		fmt.Printf("Rate limit reset:     %v\n", resp.RateLimitReset())
+	} else {
+		fmt.Printf("Could not parse rate limit from response.\n")
+	}
 }
