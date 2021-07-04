@@ -46,6 +46,10 @@ func main(){
 			go registerWebhook()
 	}
 
+	if args := os.Args; len(args) > 1 && args[1] == "-subscribe"{
+		go subscribeWebhook()
+}
+
 	//Create a new Mux Handler
 	m := mux.NewRouter()
 	//Listen to the base url and send a response
@@ -99,6 +103,7 @@ func LoadCredentials() (client *twittergo.Client, err error) {
 	}
 	user := oauth1a.NewAuthorizedConfig(lines[2], lines[3])
 	client = twittergo.NewClient(config, user)
+	// subscribeWebhook()
 	return
 }
 func registerWebhook(){
@@ -141,4 +146,36 @@ func registerWebhook(){
 	respBody, err := ioutil.ReadAll(resp.Body)
 
     fmt.Println(string(respBody))
+}
+
+func subscribeWebhook(){
+	fmt.Println("Subscribing webapp...")
+	// client := CreateClient()	
+	var (
+		err    error
+		client *twittergo.Client
+		req    *http.Request
+		resp   *twittergo.APIResponse
+	)
+	client, _ = LoadCredentials()
+	if err != nil {
+		fmt.Printf("Could not parse CREDENTIALS file: %v\n", err)
+		os.Exit(1)
+	}
+
+	path := "/1.1/account_activity/all/" + os.Getenv("WEBHOOK_ENV") + "/subscriptions.json"
+	// resp, _ := client.PostForm(path, nil)
+	values := url.Values{}
+	payload := strings.NewReader(values.Encode())
+	req, _ = http.NewRequest("POST", path, payload)
+	defer req.Body.Close()
+	//If response code is 204 it was successful
+	resp, _ = client.SendRequest(req)
+	body, _ := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode == 204 {
+			fmt.Println("Subscribed successfully")
+	} else if resp.StatusCode!= 204 {
+			fmt.Println("Could not subscribe the webhook. Response below:")
+			fmt.Println(string(body))
+	}
 }
