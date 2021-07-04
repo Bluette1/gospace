@@ -103,13 +103,11 @@ func LoadCredentials() (client *twittergo.Client, err error) {
 }
 func registerWebhook(){
 	fmt.Println("Registering webhook...")
-	// httpClient := CreateClient()
 	var (
 		err    error
 		client *twittergo.Client
 		req    *http.Request
 		resp   *twittergo.APIResponse
-		// user   *twittergo.User
 	)
 	client, err = LoadCredentials()
 	if err != nil {
@@ -118,10 +116,10 @@ func registerWebhook(){
 	}
 
 	//Set parameters
-	path := "/1.1/account_activity/all/"+os.Getenv("WEBHOOK_ENV")+"/webhooks.json"
-  fmt.Println(path)
 	values := url.Values{}
 	appUrl := url.QueryEscape(os.Getenv("APP_URL")+"/webhook/twitter")
+	path := "/1.1/account_activity/all/"+os.Getenv("WEBHOOK_ENV")+"/webhooks.json?url="+appUrl
+
 	values.Set("url", appUrl)
 
 	body := strings.NewReader(values.Encode())
