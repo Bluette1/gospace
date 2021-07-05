@@ -59,6 +59,8 @@ func main(){
 	})
 	//Listen to crc check and handle
 	m.HandleFunc("/webhook/twitter", CrcCheck).Methods("GET")
+	 //Listen to webhook event and handle
+	 m.HandleFunc("/webhook/twitter", WebhookHandler).Methods("POST")
 
 	//Start Server
 	server := &http.Server{
@@ -67,6 +69,77 @@ func main(){
 	server.Addr = ":9090"
 	server.ListenAndServe()
 }
+func SendTweet(tweet string, reply_id string) (*Tweet, error) {
+	fmt.Println("Sending tweet as reply to " + reply_id)
+	//Initialize tweet object to store response in
+	var responseTweet Tweet
+	//Add params
+	params := url.Values{}
+	params.Set("status",tweet)
+	params.Set("in_reply_to_status_id",reply_id)
+	//Grab client and post
+	// client := CreateClient()
+	var (
+		err    error
+		client *twittergo.Client
+		req    *http.Request
+		resp   *twittergo.APIResponse
+	)
+	client, _ = LoadCredentials()
+	if err != nil {
+		fmt.Printf("Could not parse CREDENTIALS file: %v\n", err)
+		os.Exit(1)
+	}
+	// resp, err := client.PostForm("https://api.twitter.com/1.1/statuses/update.json",params)
+	path := "https://api.twitter.com/1.1/statuses/update.json"
+	body := strings.NewReader(params.Encode())
+	req, err = http.NewRequest("POST", path, body)
+	if err != nil {
+			return nil, err
+	}
+	defer req.Body.Close()
+	resp, err = client.SendRequest(req)
+	if err != nil {
+		fmt.Printf("Could not send request: %v\n", err)
+		os.Exit(1)
+	}
+	//Decode response and send out
+	// body, _ := ioutil.ReadAll(resp.Body)
+	respBody, err := ioutil.ReadAll(resp.Body)
+	fmt.Println(string(respBody))
+
+	// err = json.Unmarshal(body, &responseTweet)
+	if err != nil{
+			return  nil,err
+	}
+	return &responseTweet, nil
+}
+func WebhookHandler(writer http.ResponseWriter, request *http.Request) {
+	fmt.Println("Handler called")
+    //Read the body of the tweet
+    body, _ := ioutil.ReadAll(request.Body)
+    //Initialize a webhok load obhject for json decoding
+    var load WebhookLoad
+    err := json.Unmarshal(body, &load)
+    if err != nil {
+        fmt.Println("An error occured: " + err.Error())
+    }
+    //Check if it was a tweet_create_event and tweet was in the payload and it was not tweeted by the bot
+    if len(load.TweetCreateEvent) < 1 || load.UserId == load.TweetCreateEvent[0].User.IdStr {
+			fmt.Println("Tweeted by bot...")
+        return
+    }
+    //Send Hello world as a reply to the tweet, replies need to begin with the handles
+    //of accounts they are replying to
+    _, err = SendTweet("@"+load.TweetCreateEvent[0].User.Handle+" Hello World", load.TweetCreateEvent[0].IdStr)
+    if err != nil {
+        fmt.Println("An error occured:")
+        fmt.Println(err.Error())
+    } else{
+        fmt.Println("Tweet sent successfully")
+    }
+}
+
 func CrcCheck(writer http.ResponseWriter, request *http.Request){
 	//Set response header to json type
 	writer.Header().Set("Content-Type", "application/json")
@@ -90,6 +163,27 @@ func CrcCheck(writer http.ResponseWriter, request *http.Request){
 	fmt.Fprintf(writer, string(responseJson))
 }
 
+//Struct to parse webhook load
+type WebhookLoad struct {
+	UserId           string  `json:"for_user_id"`
+	TweetCreateEvent []Tweet `json:"tweet_create_events"`
+}
+
+//Struct to parse tweet
+type Tweet struct {
+	Id    int64
+	IdStr string `json:"id_str"`
+	User  User
+	Text  string
+}
+
+//Struct to parse user
+type User struct {
+	Id     int64
+	IdStr  string `json:"id_str"`
+	Name   string
+	Handle string `json:"screen_name"`
+}
 
 func LoadCredentials() (client *twittergo.Client, err error) {
 	credentials, err := ioutil.ReadFile("CREDENTIALS")
@@ -150,7 +244,6 @@ func registerWebhook(){
 
 func subscribeWebhook(){
 	fmt.Println("Subscribing webapp...")
-	// client := CreateClient()	
 	var (
 		err    error
 		client *twittergo.Client
@@ -164,7 +257,6 @@ func subscribeWebhook(){
 	}
 
 	path := "/1.1/account_activity/all/" + os.Getenv("WEBHOOK_ENV") + "/subscriptions.json"
-	// resp, _ := client.PostForm(path, nil)
 	values := url.Values{}
 	payload := strings.NewReader(values.Encode())
 	req, _ = http.NewRequest("POST", path, payload)
