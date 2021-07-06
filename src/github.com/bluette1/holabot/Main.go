@@ -50,6 +50,10 @@ func main(){
 		go subscribeWebhook()
 }
 
+if args := os.Args; len(args) > 1 && args[1] == "-delete"{
+	go deleteWebhook()
+}
+
 	//Create a new Mux Handler
 	m := mux.NewRouter()
 	//Listen to the base url and send a response
@@ -125,8 +129,9 @@ func WebhookHandler(writer http.ResponseWriter, request *http.Request) {
         fmt.Println("An error occured: " + err.Error())
     }
     //Check if it was a tweet_create_event and tweet was in the payload and it was not tweeted by the bot
-    if len(load.TweetCreateEvent) < 1 || load.UserId == load.TweetCreateEvent[0].User.IdStr {
-			fmt.Println("Tweeted by bot...")
+    // if len(load.TweetCreateEvent) < 1 || load.UserId == load.TweetCreateEvent[0].User.IdStr {
+			if len(load.TweetCreateEvent) < 1 {
+			// fmt.Println("Tweeted by bot...")
         return
     }
     //Send Hello world as a reply to the tweet, replies need to begin with the handles
@@ -197,7 +202,6 @@ func LoadCredentials() (client *twittergo.Client, err error) {
 	}
 	user := oauth1a.NewAuthorizedConfig(lines[2], lines[3])
 	client = twittergo.NewClient(config, user)
-	// subscribeWebhook()
 	return
 }
 func registerWebhook(){
@@ -223,13 +227,12 @@ func registerWebhook(){
 
 	body := strings.NewReader(values.Encode())
 	req, err = http.NewRequest("POST", path, body)
-	defer req.Body.Close()
-	
 	if err != nil {
 		fmt.Printf("Could not parse request: %v\n", err)
 		os.Exit(1)
 	}
-
+	defer req.Body.Close()
+	
 	resp, err = client.SendRequest(req)
 	if err != nil {
 		fmt.Printf("Could not send request: %v\n", err)
@@ -238,7 +241,10 @@ func registerWebhook(){
 
 	// Parse response and check response
 	respBody, err := ioutil.ReadAll(resp.Body)
-
+	if err != nil {
+		fmt.Printf("Could not parse response: %v\n", err)
+		os.Exit(1)
+	}
     fmt.Println(string(respBody))
 }
 
@@ -270,4 +276,50 @@ func subscribeWebhook(){
 			fmt.Println("Could not subscribe the webhook. Response below:")
 			fmt.Println(string(body))
 	}
+}
+
+func deleteWebhook(){
+	fmt.Println("Deleting webhook...")
+	var (
+		err    error
+		client *twittergo.Client
+		req    *http.Request
+		resp   *twittergo.APIResponse
+	)
+	client, err = LoadCredentials()
+	if err != nil {
+		fmt.Printf("Could not parse CREDENTIALS file: %v\n", err)
+		os.Exit(1)
+	}
+
+	//Set parameters
+	values := url.Values{}
+  path := "/1.1/account_activity/all/"+os.Getenv("WEBHOOK_ENV")+"/webhooks/" + os.Getenv("WEBHOOK_ID") + ".json"
+
+	body := strings.NewReader(values.Encode())
+	req, err = http.NewRequest("DELETE", path, body)
+	if err != nil {
+		fmt.Printf("Could not parse request: %v\n", err)
+		os.Exit(1)
+	}
+	defer req.Body.Close()
+	
+	resp, err = client.SendRequest(req)
+	if err != nil {
+		fmt.Printf("Could not send request: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Parse response and check response
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("Could not parse response: %v\n", err)
+		os.Exit(1)
+	}
+	if resp.StatusCode == 204 {
+		fmt.Println("Webhook deleted successfully")
+} else if resp.StatusCode!= 204 {
+		fmt.Println("Could not delete the webhook. Response below:")
+		fmt.Println(string(respBody))
+}
 }
