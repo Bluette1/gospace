@@ -54,6 +54,10 @@ if args := os.Args; len(args) > 1 && args[1] == "-delete"{
 	go deleteWebhook()
 }
 
+if args := os.Args; len(args) > 1 && args[1] == "-test"{
+	go SendTweet("So true...", "1412394638103695370")
+}
+
 	//Create a new Mux Handler
 	m := mux.NewRouter()
 	//Listen to the base url and send a response
@@ -79,10 +83,9 @@ func SendTweet(tweet string, reply_id string) (*Tweet, error) {
 	var responseTweet Tweet
 	//Add params
 	params := url.Values{}
-	params.Set("status",tweet)
+	params.Set("status", tweet)
 	params.Set("in_reply_to_status_id",reply_id)
 	//Grab client and post
-	// client := CreateClient()
 	var (
 		err    error
 		client *twittergo.Client
@@ -95,7 +98,8 @@ func SendTweet(tweet string, reply_id string) (*Tweet, error) {
 		os.Exit(1)
 	}
 	// resp, err := client.PostForm("https://api.twitter.com/1.1/statuses/update.json",params)
-	path := "https://api.twitter.com/1.1/statuses/update.json"
+	path := "/1.1/statuses/update.json?status=" + tweet
+	
 	body := strings.NewReader(params.Encode())
 	req, err = http.NewRequest("POST", path, body)
 	if err != nil {
@@ -108,7 +112,6 @@ func SendTweet(tweet string, reply_id string) (*Tweet, error) {
 		os.Exit(1)
 	}
 	//Decode response and send out
-	// body, _ := ioutil.ReadAll(resp.Body)
 	respBody, err := ioutil.ReadAll(resp.Body)
 	fmt.Println(string(respBody))
 
@@ -136,7 +139,9 @@ func WebhookHandler(writer http.ResponseWriter, request *http.Request) {
     }
     //Send Hello world as a reply to the tweet, replies need to begin with the handles
     //of accounts they are replying to
-    _, err = SendTweet("@"+load.TweetCreateEvent[0].User.Handle+" Hello World", load.TweetCreateEvent[0].IdStr)
+		_, err = SendTweet("So true...", load.TweetCreateEvent[0].IdStr)
+
+    // _, err = SendTweet("@"+load.TweetCreateEvent[0].User.Handle+" So true...", load.TweetCreateEvent[0].IdStr)
     if err != nil {
         fmt.Println("An error occured:")
         fmt.Println(err.Error())
