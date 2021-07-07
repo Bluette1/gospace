@@ -54,8 +54,11 @@ if args := os.Args; len(args) > 1 && args[1] == "-delete"{
 	go deleteWebhook()
 }
 
-if args := os.Args; len(args) > 1 && args[1] == "-test"{
-	go SendTweet(args[2], args[3])
+if args := os.Args; len(args) > 1 && args[1] == "-reply"{
+	go ReplyToTweet(args[2], args[3])
+}
+if args := os.Args; len(args) > 1 && args[1] == "-send"{
+	go SendTweet(args[2])
 }
 
 	//Create a new Mux Handler
@@ -77,7 +80,7 @@ if args := os.Args; len(args) > 1 && args[1] == "-test"{
 	server.Addr = ":9090"
 	server.ListenAndServe()
 }
-func SendTweet(tweet string, reply_id string) (*Tweet, error) {
+func ReplyToTweet(tweet string, reply_id string) (*Tweet, error) {
 	fmt.Println("Sending tweet as reply to " + reply_id)
 	//Initialize tweet object to store response in
 	var responseTweet Tweet
@@ -121,6 +124,50 @@ func SendTweet(tweet string, reply_id string) (*Tweet, error) {
 	}
 	return &responseTweet, nil
 }
+
+func SendTweet(tweet string) (*Tweet, error) {
+	fmt.Println("Sending tweet... " )
+	//Initialize tweet object to store response in
+	var responseTweet Tweet
+	//Add params
+	params := url.Values{}
+	//These may be irrelevant because we use query params
+	params.Set("status", tweet)
+	//Grab client and post
+	var (
+		err    error
+		client *twittergo.Client
+		req    *http.Request
+		resp   *twittergo.APIResponse
+	)
+	client, _ = LoadCredentials()
+	if err != nil {
+		fmt.Printf("Could not parse CREDENTIALS file: %v\n", err)
+		os.Exit(1)
+	}
+	path := "/1.1/statuses/update.json?status=" + tweet
+	
+	body := strings.NewReader(params.Encode())
+	req, err = http.NewRequest("POST", path, body)
+	if err != nil {
+			return nil, err
+	}
+	defer req.Body.Close()
+	resp, err = client.SendRequest(req)
+	if err != nil {
+		fmt.Printf("Could not send request: %v\n", err)
+		os.Exit(1)
+	}
+	//Decode response and send out
+	respBody, _ := ioutil.ReadAll(resp.Body)
+	fmt.Println(string(respBody))
+
+	err = json.Unmarshal(respBody, &responseTweet)
+	if err != nil{
+			return  nil,err
+	}
+	return &responseTweet, nil
+}
 func WebhookHandler(writer http.ResponseWriter, request *http.Request) {
 	fmt.Println("Handler called")
     //Read the body of the tweet
@@ -138,7 +185,7 @@ func WebhookHandler(writer http.ResponseWriter, request *http.Request) {
         return
     }
     //Send `So true...` as a reply to the tweet, replies need to begin with the handles
-    _, err = SendTweet("@"+load.TweetCreateEvent[0].User.Handle+" So true...", load.TweetCreateEvent[0].IdStr)
+    _, err = ReplyToTweet("@"+load.TweetCreateEvent[0].User.Handle+" So true...", load.TweetCreateEvent[0].IdStr)
     if err != nil {
         fmt.Println("An error occured:")
         fmt.Println(err.Error())
