@@ -58,10 +58,11 @@ if args := os.Args; len(args) > 1 && args[1] == "-reply"{
 	go ReplyToTweet(args[2], args[3])
 }
 if args := os.Args; len(args) > 1 && args[1] == "-send"{
-	go SendTweet(args[2])
+  twtStr := strings.Join(args[2:], " ")
+	go SendTweet(twtStr)
 }
 
-	//Create a new Mux Handler
+	//Create a netw Mux Handler
 	m := mux.NewRouter()
 	//Listen to the base url and send a response
 	m.HandleFunc("/", func(writer http.ResponseWriter, _ *http.Request) {
@@ -115,19 +116,19 @@ func ReplyToTweet(tweet string, reply_id string) (*Tweet, error) {
 		os.Exit(1)
 	}
 	//Decode response and send out
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, _ := ioutil.ReadAll(resp.Body)
 	fmt.Println(string(respBody))
 
-	// err = json.Unmarshal(body, &responseTweet)
+	err = json.Unmarshal(respBody, &responseTweet)
 	if err != nil{
 			return  nil,err
 	}
 	return &responseTweet, nil
 }
 
-func SendTweet(tweet string) (*Tweet, error) {
-	fmt.Println("Sending tweet... " )
-	//Initialize tweet object to store response in
+func SendTweet(tweet string) (*Tweet, error)  {
+fmt.Println("Sending tweet... " )
+	// Initialize tweet object to store response in
 	var responseTweet Tweet
 	//Add params
 	params := url.Values{}
@@ -150,7 +151,7 @@ func SendTweet(tweet string) (*Tweet, error) {
 	body := strings.NewReader(params.Encode())
 	req, err = http.NewRequest("POST", path, body)
 	if err != nil {
-			return nil, err
+		return nil, err
 	}
 	defer req.Body.Close()
 	resp, err = client.SendRequest(req)
@@ -164,7 +165,7 @@ func SendTweet(tweet string) (*Tweet, error) {
 
 	err = json.Unmarshal(respBody, &responseTweet)
 	if err != nil{
-			return  nil,err
+		return  nil,err
 	}
 	return &responseTweet, nil
 }
@@ -176,21 +177,21 @@ func WebhookHandler(writer http.ResponseWriter, request *http.Request) {
     var load WebhookLoad
     err := json.Unmarshal(body, &load)
     if err != nil {
-        fmt.Println("An error occured: " + err.Error())
+			fmt.Println("An error occured: " + err.Error())
     }
     //Check if it was a tweet_create_event and tweet was in the payload and it was not tweeted by the bot
     //Should NOT send reply tweets to oneself // as it creates a chain of
 		//duplicate tweets
 		if len(load.TweetCreateEvent) < 1 || load.UserId == load.TweetCreateEvent[0].User.IdStr { 
-        return
+      return
     }
     //Send `So true...` as a reply to the tweet, replies need to begin with the handles
     _, err = ReplyToTweet("@"+load.TweetCreateEvent[0].User.Handle+" So true...", load.TweetCreateEvent[0].IdStr)
     if err != nil {
-        fmt.Println("An error occured:")
-        fmt.Println(err.Error())
+			fmt.Println("An error occured:")
+			fmt.Println(err.Error())
     } else{
-        fmt.Println("Tweet sent successfully")
+      fmt.Println("Tweet sent successfully")
     }
 }
 
@@ -200,8 +201,8 @@ func CrcCheck(writer http.ResponseWriter, request *http.Request){
 	//Get crc token in parameter
 	token := request.URL.Query()["crc_token"]
 	if len(token) < 1 {
-			fmt.Fprintf(writer,"No crc_token given")
-			return
+		fmt.Fprintf(writer,"No crc_token given")
+		return
 	}
 
 	//Encrypt and encode in base 64 then return
@@ -294,7 +295,7 @@ func registerWebhook(){
 		fmt.Printf("Could not parse response: %v\n", err)
 		os.Exit(1)
 	}
-    fmt.Println(string(respBody))
+  fmt.Println(string(respBody))
 }
 
 func subscribeWebhook(){
@@ -321,10 +322,10 @@ func subscribeWebhook(){
 	resp, _ = client.SendRequest(req)
 	body, _ := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode == 204 {
-			fmt.Println("Subscribed successfully")
+		fmt.Println("Subscribed successfully")
 	} else if resp.StatusCode!= 204 {
-			fmt.Println("Could not subscribe the webhook. Response below:")
-			fmt.Println(string(body))
+		fmt.Println("Could not subscribe the webhook. Response below:")
+		fmt.Println(string(body))
 	}
 }
 
