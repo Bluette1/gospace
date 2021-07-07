@@ -83,6 +83,7 @@ func SendTweet(tweet string, reply_id string) (*Tweet, error) {
 	var responseTweet Tweet
 	//Add params
 	params := url.Values{}
+	//These may be irrelevant because we use query params
 	params.Set("status", tweet)
 	params.Set("in_reply_to_status_id",reply_id)
 	//Grab client and post
@@ -131,15 +132,12 @@ func WebhookHandler(writer http.ResponseWriter, request *http.Request) {
         fmt.Println("An error occured: " + err.Error())
     }
     //Check if it was a tweet_create_event and tweet was in the payload and it was not tweeted by the bot
-    // if len(load.TweetCreateEvent) < 1 || load.UserId == load.TweetCreateEvent[0].User.IdStr {
-			if len(load.TweetCreateEvent) < 1 {
-			// fmt.Println("Tweeted by bot...")
+    //Should NOT send reply tweets to oneself // as it creates a chain of
+		//duplicate tweets
+		if len(load.TweetCreateEvent) < 1 || load.UserId == load.TweetCreateEvent[0].User.IdStr { 
         return
     }
-    //Send Hello world as a reply to the tweet, replies need to begin with the handles
-    //of accounts they are replying to
-		// _, err = SendTweet("So true...", load.TweetCreateEvent[0].IdStr)
-
+    //Send `So true...` as a reply to the tweet, replies need to begin with the handles
     _, err = SendTweet("@"+load.TweetCreateEvent[0].User.Handle+" So true...", load.TweetCreateEvent[0].IdStr)
     if err != nil {
         fmt.Println("An error occured:")
