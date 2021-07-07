@@ -120,8 +120,8 @@ func main() {
 	 type Member struct {
     Age       int `json:"age,string"`
 }
-//tells json.Unmarshal() to put the age JSON property,
-//  a string, and put it in the Age field of Member, 
-// translating to an int. In this example,
-//  we pass json two informations, separated with a comma.
+	//tells json.Unmarshal() to put the age JSON property,
+	// a string, and put it in the Age field of Member, 
+	// translating to an int. In this example,
+	// we pass json two informations, separated with a comma.
 }
