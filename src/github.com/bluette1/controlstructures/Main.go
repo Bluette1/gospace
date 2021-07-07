@@ -66,7 +66,7 @@ func main() {
 	// var k interface{} = 1
 	var k interface{} = [2]int{}
 	switch k.(type) { //cases are allowed to overlap, first matching case is evaluated
-	case int:
+		case int:
 		 fmt.Println("first")
 		case string:
 			fmt.Println("second")
@@ -80,11 +80,11 @@ func main() {
 
 	var m interface{} = 1
 	switch m.(type) { //cases are allowed to overlap, first matching case is evaluated
-	case int:
-		 fmt.Println("first")
-		 fmt.Println("First second line")
-		 break //can use logical test to break out
-		 fmt.Println("First third line")
+		case int:
+		  fmt.Println("first")
+		  fmt.Println("First second line")
+		  break //can use logical test to break out
+		  fmt.Println("First third line")
 		case string:
 			fmt.Println("second")
 		case [2]int:
@@ -92,6 +92,4 @@ func main() {
 		default:
 			fmt.Println("default")
 	}
-
-
 }

@@ -55,16 +55,16 @@ if args := os.Args; len(args) > 1 && args[1] == "-delete"{
 }
 
 if args := os.Args; len(args) > 1 && args[1] == "-test"{
-	go SendTweet("So true...", "1412394638103695370")
+	go SendTweet(args[2], args[3])
 }
 
 	//Create a new Mux Handler
 	m := mux.NewRouter()
 	//Listen to the base url and send a response
 	m.HandleFunc("/", func(writer http.ResponseWriter, _ *http.Request) {
-			writer.WriteHeader(200)
-			fmt.Fprintf(writer, "Server is up and running")
-	})
+		writer.WriteHeader(200)
+		fmt.Fprintf(writer, "Server is up and running")
+})
 	//Listen to crc check and handle
 	m.HandleFunc("/webhook/twitter", CrcCheck).Methods("GET")
 	 //Listen to webhook event and handle
@@ -97,8 +97,7 @@ func SendTweet(tweet string, reply_id string) (*Tweet, error) {
 		fmt.Printf("Could not parse CREDENTIALS file: %v\n", err)
 		os.Exit(1)
 	}
-	// resp, err := client.PostForm("https://api.twitter.com/1.1/statuses/update.json",params)
-	path := "/1.1/statuses/update.json?status=" + tweet
+	path := "/1.1/statuses/update.json?status=" + tweet + "&in_reply_to_status_id=" + reply_id
 	
 	body := strings.NewReader(params.Encode())
 	req, err = http.NewRequest("POST", path, body)
@@ -139,9 +138,9 @@ func WebhookHandler(writer http.ResponseWriter, request *http.Request) {
     }
     //Send Hello world as a reply to the tweet, replies need to begin with the handles
     //of accounts they are replying to
-		_, err = SendTweet("So true...", load.TweetCreateEvent[0].IdStr)
+		// _, err = SendTweet("So true...", load.TweetCreateEvent[0].IdStr)
 
-    // _, err = SendTweet("@"+load.TweetCreateEvent[0].User.Handle+" So true...", load.TweetCreateEvent[0].IdStr)
+    _, err = SendTweet("@"+load.TweetCreateEvent[0].User.Handle+" So true...", load.TweetCreateEvent[0].IdStr)
     if err != nil {
         fmt.Println("An error occured:")
         fmt.Println(err.Error())
@@ -272,6 +271,7 @@ func subscribeWebhook(){
 	payload := strings.NewReader(values.Encode())
 	req, _ = http.NewRequest("POST", path, payload)
 	defer req.Body.Close()
+
 	//If response code is 204 it was successful
 	resp, _ = client.SendRequest(req)
 	body, _ := ioutil.ReadAll(resp.Body)
