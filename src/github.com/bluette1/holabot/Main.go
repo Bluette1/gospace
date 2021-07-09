@@ -26,11 +26,35 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"net/url"
+	"flag"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 )
+
+var service  *oauth1a.Service
+//Struct to parse webhook load
+type WebhookLoad struct {
+	UserId           string  `json:"for_user_id"`
+	TweetCreateEvent []Tweet `json:"tweet_create_events"`
+}
+
+//Struct to parse tweet
+type Tweet struct {
+	Id    int64
+	IdStr string `json:"id_str"`
+	User  User
+	Text  string
+}
+
+//Struct to parse user
+type User struct {
+	Id     int64
+	IdStr  string `json:"id_str"`
+	Name   string
+	Handle string `json:"screen_name"`
+}
 
 func main(){
 	// Load env
@@ -40,6 +64,17 @@ func main(){
 			fmt.Println("Error loading .env file")
 	}
 	fmt.Println("Starting Server")
+	service = &oauth1a.Service{
+		RequestURL:   "https://api.twitter.com/oauth/request_token",
+		AuthorizeURL: "https://api.twitter.com/oauth/authorize",
+		AccessURL:    "https://api.twitter.com/oauth/access_token",
+		ClientConfig: &oauth1a.ClientConfig{
+			ConsumerKey:    os.Getenv("CONSUMER_KEY"),
+			ConsumerSecret: os.Getenv("CONSUMER_SECRET"),
+			CallbackURL:    "http://localhost:9090/callback/",
+		},
+		Signer: new(oauth1a.HmacSha1Signer),
+	}
 	
 	//Check for -register in agument list
 	if args := os.Args; len(args) > 1 && args[1] == "-register"{
@@ -74,6 +109,9 @@ if args := os.Args; len(args) > 1 && args[1] == "-send"{
 	 //Listen to webhook event and handle
 	 m.HandleFunc("/webhook/twitter", WebhookHandler).Methods("POST")
 
+	m.HandleFunc("/signin/", SignInHandler)
+	m.HandleFunc("/callback/", CallbackHandler)
+
 	//Start Server
 	server := &http.Server{
 			Handler: m,
@@ -81,6 +119,7 @@ if args := os.Args; len(args) > 1 && args[1] == "-send"{
 	server.Addr = ":9090"
 	server.ListenAndServe()
 }
+
 func ReplyToTweet(tweet string, reply_id string) (*Tweet, error) {
 	fmt.Println("Sending tweet as reply to " + reply_id)
 	//Initialize tweet object to store response in
@@ -169,6 +208,7 @@ fmt.Println("Sending tweet... " )
 	}
 	return &responseTweet, nil
 }
+
 func WebhookHandler(writer http.ResponseWriter, request *http.Request) {
 	fmt.Println("Handler called")
     //Read the body of the tweet
@@ -216,28 +256,6 @@ func CrcCheck(writer http.ResponseWriter, request *http.Request){
 	responseJson, _ := json.Marshal(response)
 	fmt.Println(string(responseJson))
 	fmt.Fprintf(writer, string(responseJson))
-}
-
-//Struct to parse webhook load
-type WebhookLoad struct {
-	UserId           string  `json:"for_user_id"`
-	TweetCreateEvent []Tweet `json:"tweet_create_events"`
-}
-
-//Struct to parse tweet
-type Tweet struct {
-	Id    int64
-	IdStr string `json:"id_str"`
-	User  User
-	Text  string
-}
-
-//Struct to parse user
-type User struct {
-	Id     int64
-	IdStr  string `json:"id_str"`
-	Name   string
-	Handle string `json:"screen_name"`
 }
 
 func LoadCredentials() (client *twittergo.Client, err error) {
@@ -369,8 +387,81 @@ func deleteWebhook(){
 	}
 	if resp.StatusCode == 204 {
 		fmt.Println("Webhook deleted successfully")
-} else if resp.StatusCode!= 204 {
+  } else if resp.StatusCode!= 204 {
 		fmt.Println("Could not delete the webhook. Response below:")
 		fmt.Println(string(respBody))
+  }
 }
+
+
+func SignInHandler(rw http.ResponseWriter, req *http.Request) {
+	var (
+		url       string
+		err       error
+		// sessionID string
+	)
+	httpClient := new(http.Client)
+	userConfig := &oauth1a.UserConfig{}
+	if err = userConfig.GetRequestToken(service, httpClient); err != nil {
+		log.Printf("Could not get request token: %v", err)
+		http.Error(rw, "Problem getting the request token", 500)
+		return
+	}
+	if url, err = userConfig.GetAuthorizeURL(service); err != nil {
+		log.Printf("Could not get authorization URL: %v", err)
+		http.Error(rw, "Problem getting the authorization URL", 500)
+		return
+	}
+	log.Printf("Redirecting user to %v\n", url)
+	// sessionID = NewSessionID()
+	// log.Printf("Starting session %v\n", sessionID)
+	// sessions[sessionID] = userConfig
+	// http.SetCookie(rw, SessionStartCookie(sessionID))
+	http.Redirect(rw, req, url, 302)
+}
+
+func CallbackHandler(rw http.ResponseWriter, req *http.Request) {
+	var (
+		err        error
+		token      string
+		verifier   string
+		// sessionID  string
+		userConfig *oauth1a.UserConfig
+		// ok         bool
+	)
+	// log.Printf("Callback hit. %v current sessions.\n", len(sessions))
+	log.Printf("Callback hit. %v current sessions.\n")
+
+	// if sessionID, err = GetSessionID(req); err != nil {
+	// 	log.Printf("Got a callback with no session id: %v\n", err)
+	// 	http.Error(rw, "No session found", 400)
+	// 	return
+	// }
+	// if userConfig, ok = sessions[sessionID]; !ok {
+	// 	log.Printf("Could not find user config in sesions storage.")
+	// 	http.Error(rw, "Invalid session", 400)
+	// 	return
+	// }
+	if token, verifier, err = userConfig.ParseAuthorize(req, service); err != nil {
+		log.Printf("Could not parse authorization: %v", err)
+		http.Error(rw, "Problem parsing authorization", 500)
+		return
+	}
+	httpClient := new(http.Client)
+	if err = userConfig.GetAccessToken(token, verifier, service, httpClient); err != nil {
+		log.Printf("Error getting access token: %v", err)
+		http.Error(rw, "Problem getting an access token", 500)
+		return
+	}
+	// log.Printf("Ending session %v.\n", sessionID)
+	// delete(sessions, sessionID)
+	// http.SetCookie(rw, SessionEndCookie())
+	rw.Header().Set("Content-Type", "text/html;charset=utf-8")
+	fmt.Fprintf(rw, "<pre>")
+	fmt.Fprintf(rw, "Access Token: %v\n", userConfig.AccessTokenKey)
+	fmt.Fprintf(rw, "Token Secret: %v\n", userConfig.AccessTokenSecret)
+	fmt.Fprintf(rw, "Screen Name:  %v\n", userConfig.AccessValues.Get("screen_name"))
+	fmt.Fprintf(rw, "User ID:      %v\n", userConfig.AccessValues.Get("user_id"))
+	fmt.Fprintf(rw, "</pre>")
+	fmt.Fprintf(rw, "<a href=\"/signin\">Sign in again</a>")
 }
