@@ -19,8 +19,10 @@ import (
 	"github.com/kurrik/oauth1a"
 	"github.com/kurrik/twittergo"
 	"io/ioutil"
+	"crypto/rand"
 	"net/http"
 	"os"
+	"io"
 	"strings"
 	"log"
 	"github.com/gorilla/mux"
@@ -33,10 +35,11 @@ import (
 	"encoding/json"
 	"time"
 )
-const shortDuration = 5 * time.Millisecond //revert to 1ms
+const shortDuration = 10000 * time.Millisecond //revert to 1ms
 
 var (
 	service  *oauth1a.Service
+	sessions map[string]*oauth1a.UserConfig
 )
 //Struct to parse webhook load
 type WebhookLoad struct {
@@ -60,8 +63,49 @@ type User struct {
 	Handle string `json:"screen_name"`
 }
 
+func NewSessionID() string {
+	c := 128
+	b := make([]byte, c)
+	n, err := io.ReadFull(rand.Reader, b)
+	if n != len(b) || err != nil {
+		panic("Could not generate random number")
+	}
+	return base64.URLEncoding.EncodeToString(b)
+}
+
+func GetSessionID(req *http.Request) (id string, err error) {
+	var c *http.Cookie
+	if c, err = req.Cookie("session_id"); err != nil {
+		return
+	}
+	id = c.Value
+	return
+}
+
+func SessionStartCookie(id string) *http.Cookie {
+	return &http.Cookie{
+		Name:   "session_id",
+		Value:  id,
+		MaxAge: 60,
+		Secure: false,
+		Path:   "/",
+	}
+}
+
+func SessionEndCookie() *http.Cookie {
+	return &http.Cookie{
+		Name:   "session_id",
+		Value:  "",
+		MaxAge: 0,
+		Secure: false,
+		Path:   "/",
+	}
+}
+
 func main(){
 	// Load env
+	sessions = map[string]*oauth1a.UserConfig{}
+
 	err := godotenv.Load()
 	if err != nil {
 			log.Fatal("Error loading .env file")
@@ -76,7 +120,7 @@ func main(){
 		ClientConfig: &oauth1a.ClientConfig{
 			ConsumerKey:    os.Getenv("CONSUMER_KEY"),
 			ConsumerSecret: os.Getenv("CONSUMER_SECRET"),
-			CallbackURL:    "http://localhost:9090/callback/",
+			CallbackURL:    os.Getenv("APP_URL") + "/callback/",
 		},
 		Signer: new(oauth1a.HmacSha1Signer),
 	}
@@ -105,10 +149,11 @@ if args := os.Args; len(args) > 1 && args[1] == "-send"{
 	//Create a netw Mux Handler
 	m := mux.NewRouter()
 	//Listen to the base url and send a response
-	m.HandleFunc("/", func(writer http.ResponseWriter, _ *http.Request) {
-		writer.WriteHeader(200)
-		fmt.Fprintf(writer, "Server is up and running")
-})
+// 	m.HandleFunc("/", func(writer http.ResponseWriter, _ *http.Request) {
+// 		writer.WriteHeader(200)
+// 		fmt.Fprintf(writer, "Server is up and running")
+// })
+	m.HandleFunc("/", BaseHandler)
 	//Listen to crc check and handle
 	m.HandleFunc("/webhook/twitter", CrcCheck).Methods("GET")
 	 //Listen to webhook event and handle
@@ -403,7 +448,7 @@ func SignInHandler(rw http.ResponseWriter, req *http.Request) {
 	var (
 		url       string
 		err       error
-		// sessionID string
+		sessionID string
 	)
 	httpClient := new(http.Client)
 	userConfig := &oauth1a.UserConfig{}
@@ -421,10 +466,10 @@ func SignInHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	log.Printf("Redirecting user to %v\n", url)
-	// sessionID = NewSessionID()
-	// log.Printf("Starting session %v\n", sessionID)
-	// sessions[sessionID] = userConfig
-	// http.SetCookie(rw, SessionStartCookie(sessionID))
+	sessionID = NewSessionID()
+	log.Printf("Starting session %v\n", sessionID)
+	sessions[sessionID] = userConfig
+	http.SetCookie(rw, SessionStartCookie(sessionID))
 	http.Redirect(rw, req, url, http.StatusFound)
 }
 
@@ -433,23 +478,22 @@ func CallbackHandler(rw http.ResponseWriter, req *http.Request) {
 		err        error
 		token      string
 		verifier   string
-		// sessionID  string
+		sessionID  string
 		userConfig *oauth1a.UserConfig
-		// ok         bool
+		ok         bool
 	)
-	// log.Printf("Callback hit. %v current sessions.\n", len(sessions))
-	log.Printf("Callback hit. %v current sessions.\n")
+	log.Printf("Callback hit. %v current sessions.\n", len(sessions))
 
-	// if sessionID, err = GetSessionID(req); err != nil {
-	// 	log.Printf("Got a callback with no session id: %v\n", err)
-	// 	http.Error(rw, "No session found", 400)
-	// 	return
-	// }
-	// if userConfig, ok = sessions[sessionID]; !ok {
-	// 	log.Printf("Could not find user config in sesions storage.")
-	// 	http.Error(rw, "Invalid session", 400)
-	// 	return
-	// }
+	if sessionID, err = GetSessionID(req); err != nil {
+		log.Printf("Got a callback with no session id: %v\n", err)
+		http.Error(rw, "No session found", 400)
+		return
+	}
+	if userConfig, ok = sessions[sessionID]; !ok {
+		log.Printf("Could not find user config in sesions storage.")
+		http.Error(rw, "Invalid session", 400)
+		return
+	}
 	if token, verifier, err = userConfig.ParseAuthorize(req, service); err != nil {
 		log.Printf("Could not parse authorization: %v", err)
 		http.Error(rw, "Problem parsing authorization", 500)
@@ -460,13 +504,13 @@ func CallbackHandler(rw http.ResponseWriter, req *http.Request) {
 	defer cancel()
 	httpClient := new(http.Client)
 	if err = userConfig.GetAccessToken(ctx, token, verifier, service, httpClient); err != nil {
-		// log.Printf("Error getting access token: %v", err)
-		// http.Error(rw, "Problem getting an access token", 500)
+		log.Printf("Error getting access token: %v", err)
+		http.Error(rw, "Problem getting an access token", 500)
 		return
 	}
-	// log.Printf("Ending session %v.\n", sessionID)
-	// delete(sessions, sessionID)
-	// http.SetCookie(rw, SessionEndCookie())
+	log.Printf("Ending session %v.\n", sessionID)
+	delete(sessions, sessionID)
+	http.SetCookie(rw, SessionEndCookie())
 	rw.Header().Set("Content-Type", "text/html;charset=utf-8")
 	fmt.Fprintf(rw, "<pre>")
 	fmt.Fprintf(rw, "Access Token: %v\n", userConfig.AccessTokenKey)
@@ -475,4 +519,9 @@ func CallbackHandler(rw http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(rw, "User ID:      %v\n", userConfig.AccessValues.Get("user_id"))
 	fmt.Fprintf(rw, "</pre>")
 	fmt.Fprintf(rw, "<a href=\"/signin\">Sign in again</a>")
+}
+
+func BaseHandler(rw http.ResponseWriter, req *http.Request) {
+	rw.Header().Set("Content-Type", "text/html;charset=utf-8")
+	fmt.Fprintf(rw, "<a href=\"/signin\">Sign in</a>")
 }
