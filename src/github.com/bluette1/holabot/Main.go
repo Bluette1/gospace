@@ -263,7 +263,7 @@ func WebhookHandler(writer http.ResponseWriter, request *http.Request) {
 	fmt.Println("Handler called")
     //Read the body of the tweet
     body, _ := ioutil.ReadAll(request.Body)
-    //Initialize a webhok load obhject for json decoding
+    //Initialize a webhok load object for json decoding
     var load WebhookLoad
     err := json.Unmarshal(body, &load)
     if err != nil {
@@ -272,15 +272,18 @@ func WebhookHandler(writer http.ResponseWriter, request *http.Request) {
     //Check if it was a tweet_create_event and tweet was in the payload and it was not tweeted by the bot
     //Should NOT send reply tweets to oneself // as it creates a chain of
 		//duplicate tweets
-		if len(load.TweetCreateEvent) < 1 || load.UserId == load.TweetCreateEvent[0].User.IdStr { 
+		fmt.Println("Load:" + string(body))
+		// if len(load.TweetCreateEvent) < 1 || load.UserId == load.TweetCreateEvent[0].User.IdStr { 
+			if len(load.TweetCreateEvent) < 1 { 
+
       return
     }
-    //Send `So true...` as a reply to the tweet, replies need to begin with the handles
-    _, err = ReplyToTweet("@"+load.TweetCreateEvent[0].User.Handle+" So true...", load.TweetCreateEvent[0].IdStr)
+    //Send `Thank you for sharing...` as a reply to the tweet, replies need to begin with the handles
+    _, err = ReplyToTweet("@"+load.TweetCreateEvent[0].User.Handle+" Thank you for sharing...", load.TweetCreateEvent[0].IdStr)
     if err != nil {
 			fmt.Println("An error occured:")
 			fmt.Println(err.Error())
-    } else{
+    } else {
       fmt.Println("Tweet sent successfully")
     }
 }
