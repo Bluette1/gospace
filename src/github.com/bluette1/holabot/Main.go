@@ -26,14 +26,18 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"net/url"
-	"flag"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"time"
 )
+const shortDuration = 5 * time.Millisecond //revert to 1ms
 
-var service  *oauth1a.Service
+var (
+	service  *oauth1a.Service
+)
 //Struct to parse webhook load
 type WebhookLoad struct {
 	UserId           string  `json:"for_user_id"`
@@ -64,6 +68,7 @@ func main(){
 			fmt.Println("Error loading .env file")
 	}
 	fmt.Println("Starting Server")
+
 	service = &oauth1a.Service{
 		RequestURL:   "https://api.twitter.com/oauth/request_token",
 		AuthorizeURL: "https://api.twitter.com/oauth/authorize",
@@ -402,7 +407,10 @@ func SignInHandler(rw http.ResponseWriter, req *http.Request) {
 	)
 	httpClient := new(http.Client)
 	userConfig := &oauth1a.UserConfig{}
-	if err = userConfig.GetRequestToken(service, httpClient); err != nil {
+	d := time.Now().Add(shortDuration)
+	ctx, cancel := context.WithDeadline(context.Background(), d)
+  defer cancel()
+	if err = userConfig.GetRequestToken(ctx, service, httpClient); err != nil {
 		log.Printf("Could not get request token: %v", err)
 		http.Error(rw, "Problem getting the request token", 500)
 		return
@@ -447,8 +455,11 @@ func CallbackHandler(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "Problem parsing authorization", 500)
 		return
 	}
+	d := time.Now().Add(shortDuration)
+	ctx, cancel := context.WithDeadline(context.Background(), d)
+	defer cancel()
 	httpClient := new(http.Client)
-	if err = userConfig.GetAccessToken(token, verifier, service, httpClient); err != nil {
+	if err = userConfig.GetAccessToken(ctx, token, verifier, service, httpClient); err != nil {
 		log.Printf("Error getting access token: %v", err)
 		http.Error(rw, "Problem getting an access token", 500)
 		return
