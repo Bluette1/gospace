@@ -259,7 +259,7 @@ func CrcCheck(writer http.ResponseWriter, request *http.Request){
 	response["response_token"] =  "sha256=" + encoded
 	//Turn response map to json and send it to the writer
 	responseJson, _ := json.Marshal(response)
-	fmt.Println(string(responseJson))
+	// fmt.Println(string(responseJson))
 	fmt.Fprintf(writer, string(responseJson))
 }
 
@@ -425,7 +425,7 @@ func SignInHandler(rw http.ResponseWriter, req *http.Request) {
 	// log.Printf("Starting session %v\n", sessionID)
 	// sessions[sessionID] = userConfig
 	// http.SetCookie(rw, SessionStartCookie(sessionID))
-	http.Redirect(rw, req, url, 302)
+	http.Redirect(rw, req, url, http.StatusFound)
 }
 
 func CallbackHandler(rw http.ResponseWriter, req *http.Request) {
@@ -460,8 +460,8 @@ func CallbackHandler(rw http.ResponseWriter, req *http.Request) {
 	defer cancel()
 	httpClient := new(http.Client)
 	if err = userConfig.GetAccessToken(ctx, token, verifier, service, httpClient); err != nil {
-		log.Printf("Error getting access token: %v", err)
-		http.Error(rw, "Problem getting an access token", 500)
+		// log.Printf("Error getting access token: %v", err)
+		// http.Error(rw, "Problem getting an access token", 500)
 		return
 	}
 	// log.Printf("Ending session %v.\n", sessionID)
