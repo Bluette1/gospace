@@ -25,7 +25,14 @@
   holabot -subscribe
 ``` 
 
+#### Twitter signin
 
+-To grant permission from a Twitter user, you have to implement [Twitter Signin](https://developer.twitter.com/en/docs/authentication/guides/log-in-with-twitter) 
+- Edit app settings to enable [3-legged OAuth](https://developer.twitter.com/en/docs/authentication/oauth-1-0a/obtaining-user-access-tokens)
+   - Make sure you register the callback url you'll be using in your implementation of twitter signin.
+- Start the bot by running `holabot`
+- Hit the root http://localhost:9090/signin
+   - Follow the instructions to sign into Twitter for a successful login process
 #### Authors
 
 👤 **Marylene Sawyer**
@@ -40,7 +47,10 @@
   - [How to create a Twitter bot from scratch with Golang](https://kofo.dev/how-to-create-a-twitter-bot-from-scratch-with-golang)
   - [Post, Retrieve and Engage with Tweets](https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-update)
   - [Account Activity Api: Premium](https://developer.twitter.com/en/docs/twitter-api/premium/account-activity-api/api-reference/aaa-premium#post-account-activity-all-env-name-subscriptions)
-
+  -
+[Twittergo Examples](https://github.com/kurrik/twittergo-examples/blob/master/sign_in/main.go)
+[Outh1a](https://golangrepo.com/repo/kurrik-oauth1a-go-authentication-oauth)
+[Twitter Signin](https://developer.twitter.com/en/docs/authentication/guides/log-in-with-twitter)
 #### 🤝 Contributing
 
 Contributions, issues and feature requests are welcome!

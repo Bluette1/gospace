@@ -1,0 +1,8 @@
+github.com/gorilla/mux v1.8.0 h1:i40aqfkR1h2SlN9hojwV5ZA91wcXFOvkdNIeFDP5koI=
+github.com/gorilla/mux v1.8.0/go.mod h1:DVbg23sWSpFRCP0SfiEN6jmj59UnW/n46BH5rLB71So=
+github.com/joho/godotenv v1.3.0 h1:Zjp+RcGpHhGlrMbJzXTrZZPrWj+1vfm90La1wgB6Bhc=
+github.com/joho/godotenv v1.3.0/go.mod h1:7hK45KPybAkOC6peb+G5yklZfMxEjkZhHbwpqxOKXbg=
+github.com/kurrik/oauth1a v0.1.1 h1:3myAVza5bCMnyW/0gcVtQUeYaqcMKmniNxOIm0ESjek=
+github.com/kurrik/oauth1a v0.1.1/go.mod h1:2lmEMbW1BVM6RfQ6aN+b7kQSegGdXU4XeVfHKm4qxM0=
+github.com/kurrik/twittergo v0.0.0-20201111073046-3e2792781fcf h1:b14A8Ukt9rp5f/vIC4VV4xSad0pwm/khV+11SLLrcvI=
+github.com/kurrik/twittergo v0.0.0-20201111073046-3e2792781fcf/go.mod h1:8LXjN6yItBbjlBtxMRLCfWK46yaoqRignovBZnyTiQ4=
