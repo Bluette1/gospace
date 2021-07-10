@@ -68,7 +68,7 @@ func main() {
 		}
 	}
 
-	//For range loop
+	//For range loop to iterate over collections
 	s := []int{1, 2, 3}
 	// for _, v := range s {
 	// for k := range s {
