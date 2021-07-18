@@ -1,6 +1,3 @@
-# gospace
-- A practice repository for the Golang programming language.
-
 ## holabot
 - A twitter bot that responds to tweets.
 
@@ -47,7 +44,7 @@
   - [How to create a Twitter bot from scratch with Golang](https://kofo.dev/how-to-create-a-twitter-bot-from-scratch-with-golang)
   - [Post, Retrieve and Engage with Tweets](https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-update)
   - [Account Activity Api: Premium](https://developer.twitter.com/en/docs/twitter-api/premium/account-activity-api/api-reference/aaa-premium#post-account-activity-all-env-name-subscriptions)
-  -
+  
 [Twittergo Examples](https://github.com/kurrik/twittergo-examples/blob/master/sign_in/main.go)
 [Outh1a](https://golangrepo.com/repo/kurrik-oauth1a-go-authentication-oauth)
 [Twitter Signin](https://developer.twitter.com/en/docs/authentication/guides/log-in-with-twitter)
