@@ -2,10 +2,11 @@
 - A practice repository for the Golang programming language.
 
 ## Setting up the dev environment:
-- Follow the instructions according to this [Tutorial](https://www.youtube.com/watch?v=YS4e4q9oBaU)
+- Follow the instructions according to this [Tutorial](https://www.youtube.com/watch?v=YS4e4q9oBaU) to install Go and set up the dev environment.
 
 ## Folders 
 - The following sourcecode folders are included in the path `src/github.com/bluette1/`:
+- tutorial
   - types
   - scope
   - constants
